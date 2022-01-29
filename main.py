@@ -5,6 +5,8 @@ import grequests
 import requests
 from requests import Response
 
+from mongo import products_collection
+
 base_url = 'https://www.digikala.com'
 
 
@@ -63,12 +65,17 @@ def parse_product_page(res: Response) -> dict:
     return data
 
 
+def insert_data(data, collection):
+    inserted = products_collection.insert_one(data)
+
+
 def main():
     links = get_links()
     for link in links:
         res = get_product_page(link)
         data = parse_product_page(res)
-        print(data)
+        inserted = products_collection.insert_one(data)
+        print(inserted.acknowledged)
 
 
 if __name__ == '__main__':
