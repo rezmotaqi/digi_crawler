@@ -7,6 +7,4 @@
 # Editor-based HTTP Client requests
 /httpReques.ts/
 
-/idea
-.idea
-./idea
+*
