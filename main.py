@@ -22,12 +22,12 @@ def get_links() -> list:
     return links
 
 
-def get_product_info(link: str) -> Response:
+def get_product_page(link: str) -> Response:
     res = requests.get(f'{base_url}' + f'{link}')
     return res
 
 
-def parse_product_info(res: Response) -> dict:
+def parse_product_page(res: Response) -> dict:
     soup = BeautifulSoup(res.text, 'lxml')
     product_name = soup.find('div', class_='c-product__title-container').find('h1').text.replace('\n', '').strip()
     final_price = soup.find('div', class_='c-product__seller-price-pure js-price-value').text.replace('\n',
@@ -66,8 +66,8 @@ def parse_product_info(res: Response) -> dict:
 def main():
     links = get_links()
     for link in links:
-        res = get_product_info(link)
-        data = parse_product_info(res)
+        res = get_product_page(link)
+        data = parse_product_page(res)
         print(data)
 
 
