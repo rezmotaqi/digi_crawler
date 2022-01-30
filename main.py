@@ -1,3 +1,4 @@
+import platform
 import re
 import asyncio
 from datetime import datetime
@@ -25,22 +26,15 @@ def get_links() -> list:
     return links
 
 
-async def get_product_page(link: str, session: ClientSession) -> (Response, None):
-
+async def get_product_page(link: str, session: ClientSession) -> (ClientSession, None):
     res = await session.request(method="GET", url=f'{base_url}' + f'{link}')
     res_text = await res.text()
     return res, res_text
 
-    # if res is not None:
-    #
-    #     return
-    # else:
-    #     print(f'respone from {link} on {datetime.now()} was none')
-    #     return res
 
-
-async def parse_product_page(res: Response, res_text: str) -> dict:
+async def parse_product_page(res: ClientSession, res_text: str) -> dict:
     if res is not None:
+
         soup = BeautifulSoup(res_text, 'lxml')
         product_name = soup.find('div', class_='c-product__title-container').find('h1').text.replace('\n', '').strip()
 
@@ -58,9 +52,6 @@ async def parse_product_page(res: Response, res_text: str) -> dict:
             before_discount = before_discount.text.replace('\n', '').strip()
 
         image_link = soup.find('div', class_='c-gallery__img').img.attrs['data-src']
-
-
-
 
         pid = re.search('^.*/dkp-(\d+)/.*$', str(res.url))
         product_id = pid.group(1)
@@ -121,6 +112,7 @@ async def main():
 
     async with ClientSession() as session:
         res = await asyncio.gather(*(get_product_page(link, session) for link in links))
+
     for r in res:
         data = await parse_product_page(*r)
         product_inserted = insert_product(data)
@@ -133,10 +125,11 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    if platform.system() == 'Windows':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    m = lambda x = None: asyncio.run(main())
-    m()
-    schedule.every(60).minutes.do(m)
+    job = lambda x=None: asyncio.run(main())
+    job()
+    schedule.every(60).minutes.do(job)
     while True:
         schedule.run_pending()
