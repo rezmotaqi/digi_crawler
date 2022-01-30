@@ -26,6 +26,14 @@ async def parse(response):
     return data
 
 
+def get_data():
+    page_number = gen_random_page_number()
+    res = asyncio.run(get_pages())[page_number]
+    data = asyncio.run(parse(response=res))
+
+    return data
+
+
 class Test(unittest.TestCase):
 
     def test_get_links(self):
@@ -39,21 +47,19 @@ class Test(unittest.TestCase):
         self.assertEqual(asyncio.run(get_pages())[page][0].status, 200)
 
     def test_product_data_pname(self):
-        page_number = gen_random_page_number()
-        res = asyncio.run(get_pages())[page_number]
-        data = asyncio.run(parse(response=res))
+        data = get_data()
         self.assertIsNotNone(data['product_name'])
 
     def test_product_data_rating(self):
-        data = main.parse_product_page(main.get_product_page(main.get_links()[0]))
+        data = get_data()
         self.assertIsNotNone(data['ratings'])
 
     def test_insert_history(self):
-        data = main.parse_product_page(main.get_product_page(main.get_links()[0]))
+        data = get_data()
         self.assertEqual(main.insert_history(data).acknowledged, True)
 
     def test_insert_product(self):
-        data = main.parse_product_page(main.get_product_page(main.get_links()[0]))
+        data = get_data()
         self.assertIsNotNone(main.insert_product(data), True)
 
 
