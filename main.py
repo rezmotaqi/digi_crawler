@@ -1,13 +1,10 @@
 import re
 import asyncio
 from datetime import datetime
-
 from bs4 import BeautifulSoup
 import grequests
 import requests
-from pymongo import ReturnDocument
 from requests import Response
-
 from mongo import products_collection, product_history_collection
 
 base_url = 'https://www.digikala.com'
