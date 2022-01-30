@@ -1,5 +1,4 @@
 import os
-
 import pymongo
 
 
@@ -11,7 +10,6 @@ except (ValueError, KeyError):
 
 
 myclient = pymongo.MongoClient(mongo_uri)
-
 
 mydb = myclient["digi"]
 products_collection = mydb["products"]

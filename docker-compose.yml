@@ -1,38 +1,26 @@
 version: '3.7'
 services:
 
-
   crawler:
     image: crawler:0.1
     restart: always
     command: sh -c "python -m main.py"
     container_name: crawler
-    ports:
-      - 8000:8000
     volumes:
       - ./digi_crawler:/digi_crawler
     environment:
-      - DEBUG=1
-      - SECRET_KEY=i0i4_&4m&8*1hf1&*@ix4s5ssqba0lc6yd1h2m74crxxt5q-kr
-      - DJANGO_ALLOWED_HOSTS=
-      - SQL_ENGINE=django.db.backends.mysql
-      - SQL_DATABASE=webapp
-      - SQL_USER=root
-      - SQL_PASSWORD=!QAZ2wsx
-      - SQL_HOST=130.185.120.221
-      - SQL_PORT=3307
-      - Redis_HOST=130.185.120.221
-      - Redis_PORT=6379
-      - Redis_PASSWORD=redis@123redis@123
+      MONGODB_USERNAME: user
+      MONGODB_PASSWORD: password
+      MONGODB_HOSTNAME: mongodb
+      MONGODB_DATABASE: digi
     depends_on:
-      - mariadb
-      - redis
+      - mongodb
 
 
   mongodb:
     image: mongo
     container_name: mongodb
-    restart: unless-always
+    restart: on-failure
     command: mongod --auth
     environment:
       MONGO_INITDB_ROOT_USERNAME: mongodbuser
@@ -42,20 +30,3 @@ services:
       MONDODB_LOG_DIR: /dev/null
     volumes:
       - mongodbdata:/data/db
-    networks:
-      - backend
-
-
-  mariadb:
-    image: mariadb:10.5
-    restart: always
-    container_name: mariadb
-    volumes:
-      - /home/mysql:/var/lib/mysql
-      - /etc/localtime:/etc/localtime:ro
-      - /home/mysql/my.cnf:/etc/mysql/my.cnf
-      - /home/db-backup:/backup
-    ports:
-      - 3307:3306
-    environment:
-      - MYSQL_ROOT_PASSWORD=!QAZ2wsx

@@ -137,6 +137,6 @@ if __name__ == '__main__':
 
     m = lambda x = None: asyncio.run(main())
     m()
-    schedule.every(3).minutes.do(m)
+    schedule.every(60).minutes.do(m)
     while True:
         schedule.run_pending()
