@@ -1,6 +1,9 @@
 import re
 import asyncio
+import time
 from datetime import datetime
+
+import schedule as schedule
 from bs4 import BeautifulSoup
 import grequests
 import requests
@@ -32,6 +35,7 @@ def get_product_page(link: str) -> Response:
 def parse_product_page(res: Response) -> dict:
     soup = BeautifulSoup(res.text, 'lxml')
     product_name = soup.find('div', class_='c-product__title-container').find('h1').text.replace('\n', '').strip()
+    print(res.url)
     final_price = soup.find('div', class_='c-product__seller-price-pure js-price-value').text.replace('\n',
                                                                                                       '').strip()
     before_discount = soup.find('div', class_='c-product__seller-price-info') \
@@ -99,9 +103,15 @@ def main():
         product_inserted = insert_product(data)
         history_inserted = insert_history(data)
 
-        print(history_inserted.acknowledged)
-        print(product_inserted, 'product inserted')
+        # print(history_inserted.acknowledged)
+        # print(product_inserted, 'product inserted')
+
+    print('Job was done at',)
+    print(time.localtime(), '\n\n\n\n\n\n')
 
 
 if __name__ == '__main__':
-    main()
+    schedule.every(5).minutes.do(main())
+    while True:
+        schedule.run_pending()
+        time.sleep(300)
