@@ -22,6 +22,16 @@ class Test(unittest.TestCase):
         data = main.parse_product_page(main.get_product_page(main.get_links()[0]))
         self.assertIsNotNone(data['ratings'])
 
+    def test_insert_history(self):
+        data = main.parse_product_page(main.get_product_page(main.get_links()[0]))
+        self.assertEqual(main.insert_history(data).acknowledged, True)
+
+    def test_insert_product(self):
+        data = main.parse_product_page(main.get_product_page(main.get_links()[0]))
+        self.assertIsNotNone(main.insert_product(data), True)
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

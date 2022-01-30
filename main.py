@@ -1,18 +1,21 @@
 import re
 import asyncio
+from datetime import datetime
+
 from bs4 import BeautifulSoup
 import grequests
 import requests
+from pymongo import ReturnDocument
 from requests import Response
 
-from mongo import products_collection
+from mongo import products_collection, product_history_collection
 
 base_url = 'https://www.digikala.com'
 
 
 def get_links() -> list:
     """
-    return list of links for 36 most viewed smart phones
+    return list of links for 36 most viewed smart phones in first page
     """
     res = requests.get('https://www.digikala.com/search/category-mobile-phone/')
     soup = BeautifulSoup(res.text, 'lxml')
@@ -34,10 +37,10 @@ def parse_product_page(res: Response) -> dict:
     product_name = soup.find('div', class_='c-product__title-container').find('h1').text.replace('\n', '').strip()
     final_price = soup.find('div', class_='c-product__seller-price-pure js-price-value').text.replace('\n',
                                                                                                       '').strip()
-    discount_price = soup.find('div', class_='c-product__seller-price-info') \
+    before_discount = soup.find('div', class_='c-product__seller-price-info') \
         .find('div', class_='c-product__seller-price-prev js-rrp-price')
-    if discount_price is not None:
-        discount_price = discount_price.text.replace('\n', '').strip()
+    if before_discount is not None:
+        before_discount = before_discount.text.replace('\n', '').strip()
 
     image_link = soup.find('div', class_='c-gallery__img').img.attrs['data-src']
 
@@ -53,10 +56,11 @@ def parse_product_page(res: Response) -> dict:
         ratings[key] = value
 
     data = {
+        "product_id": int(product_id),
         "product_link": res.url,
         "product_name": product_name,
-        "price": final_price,
-        "discount_price": discount_price,
+        "final_price": final_price,
+        "before_discount": before_discount,
         "image_link": image_link,
         "ratings": ratings
 
@@ -65,8 +69,29 @@ def parse_product_page(res: Response) -> dict:
     return data
 
 
-def insert_data(data, collection):
-    inserted = products_collection.insert_one(data)
+def insert_product(data):
+    product = products_collection.find_one(filter={'product_id': data['product_id']})
+    if product is not None:
+        product_inserted = products_collection.find_one_and_replace(filter={"_id": product['_id']}, replacement={
+
+                "product_id": data['product_id'],
+                "product_link": data['product_link'],
+                "product_name": data['product_name'],
+                "final_price": data['final_price'],
+                "before_discount": data['before_discount'],
+                "image_link": data['image_link'],
+                "ratings": data['ratings']
+
+        })
+    else:
+        product_inserted = products_collection.insert_one(data)
+    return product_inserted
+
+
+def insert_history(data):
+    data['createdAt'] = datetime.now()
+    history_inserted = product_history_collection.insert_one(data)
+    return history_inserted
 
 
 def main():
@@ -74,8 +99,11 @@ def main():
     for link in links:
         res = get_product_page(link)
         data = parse_product_page(res)
-        inserted = products_collection.insert_one(data)
-        print(inserted.acknowledged)
+        product_inserted = insert_product(data)
+        history_inserted = insert_history(data)
+
+        print(history_inserted.acknowledged)
+        print(product_inserted, 'product inserted')
 
 
 if __name__ == '__main__':
