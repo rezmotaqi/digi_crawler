@@ -1,11 +1,9 @@
 import re
 import asyncio
-import time
 from datetime import datetime
-
+from aiohttp import ClientSession
 import schedule as schedule
 from bs4 import BeautifulSoup
-import grequests
 import requests
 from requests import Response
 from mongo import products_collection, product_history_collection
@@ -27,47 +25,68 @@ def get_links() -> list:
     return links
 
 
-def get_product_page(link: str) -> Response:
-    res = requests.get(f'{base_url}' + f'{link}')
-    return res
+async def get_product_page(link: str, session: ClientSession) -> (Response, None):
+
+    res = await session.request(method="GET", url=f'{base_url}' + f'{link}')
+    res_text = await res.text()
+    return res, res_text
+
+    # if res is not None:
+    #
+    #     return
+    # else:
+    #     print(f'respone from {link} on {datetime.now()} was none')
+    #     return res
 
 
-def parse_product_page(res: Response) -> dict:
-    soup = BeautifulSoup(res.text, 'lxml')
-    product_name = soup.find('div', class_='c-product__title-container').find('h1').text.replace('\n', '').strip()
-    print(res.url)
-    final_price = soup.find('div', class_='c-product__seller-price-pure js-price-value').text.replace('\n',
-                                                                                                      '').strip()
-    before_discount = soup.find('div', class_='c-product__seller-price-info') \
-        .find('div', class_='c-product__seller-price-prev js-rrp-price')
-    if before_discount is not None:
-        before_discount = before_discount.text.replace('\n', '').strip()
+async def parse_product_page(res: Response, res_text: str) -> dict:
+    if res is not None:
+        soup = BeautifulSoup(res_text, 'lxml')
+        product_name = soup.find('div', class_='c-product__title-container').find('h1').text.replace('\n', '').strip()
 
-    image_link = soup.find('div', class_='c-gallery__img').img.attrs['data-src']
+        try:
+            final_price = soup.find('div', class_='c-product__seller-price-pure js-price-value').text.replace('\n',
+                                                                                                              '').strip()
+        except Exception as e:
+            print(e)
+            final_price = None
+            pass
 
-    pid = re.search('^.*/dkp-(\d+)/.*$', res.url)
-    product_id = pid.group(1)
-    rating_res = requests.get(f'{base_url}' + '/ajax/product/comments/' + product_id + '/')
-    rating_soup = BeautifulSoup(rating_res.text, 'lxml')
-    ratings_ul = rating_soup.find('ul', class_="c-content-expert__rating")
-    ratings = {}
-    for li in ratings_ul.find_all('li'):
-        key = li.find('div', class_="c-content-expert__rating-title").text
-        value = li.find('span', class_="c-rating__overall-word").text
-        ratings[key] = value
+        before_discount = soup.find('div', class_='c-product__seller-price-info') \
+            .find('div', class_='c-product__seller-price-prev js-rrp-price')
+        if before_discount is not None:
+            before_discount = before_discount.text.replace('\n', '').strip()
 
-    data = {
-        "product_id": int(product_id),
-        "product_link": res.url,
-        "product_name": product_name,
-        "final_price": final_price,
-        "before_discount": before_discount,
-        "image_link": image_link,
-        "ratings": ratings
+        image_link = soup.find('div', class_='c-gallery__img').img.attrs['data-src']
 
-    }
 
-    return data
+
+
+        pid = re.search('^.*/dkp-(\d+)/.*$', str(res.url))
+        product_id = pid.group(1)
+        rating_res = requests.get(f'{base_url}' + '/ajax/product/comments/' + product_id + '/')
+        rating_soup = BeautifulSoup(rating_res.text, 'lxml')
+        ratings_ul = rating_soup.find('ul', class_="c-content-expert__rating")
+        ratings = {}
+        for li in ratings_ul.find_all('li'):
+            key = li.find('div', class_="c-content-expert__rating-title").text
+            value = li.find('span', class_="c-rating__overall-word").text
+            ratings[key] = value
+
+        data = {
+            "product_id": int(product_id),
+            "product_link": str(res.url),
+            "product_name": product_name,
+            "final_price": final_price,
+            "before_discount": before_discount,
+            "image_link": image_link,
+            "ratings": ratings
+
+        }
+
+        return data
+
+    pass
 
 
 def insert_product(data):
@@ -75,13 +94,13 @@ def insert_product(data):
     if product is not None:
         product_inserted = products_collection.find_one_and_replace(filter={"_id": product['_id']}, replacement={
 
-                "product_id": data['product_id'],
-                "product_link": data['product_link'],
-                "product_name": data['product_name'],
-                "final_price": data['final_price'],
-                "before_discount": data['before_discount'],
-                "image_link": data['image_link'],
-                "ratings": data['ratings']
+            "product_id": data['product_id'],
+            "product_link": data['product_link'],
+            "product_name": data['product_name'],
+            "final_price": data['final_price'],
+            "before_discount": data['before_discount'],
+            "image_link": data['image_link'],
+            "ratings": data['ratings']
 
         })
     else:
@@ -95,23 +114,29 @@ def insert_history(data):
     return history_inserted
 
 
-def main():
+async def main():
+    print('Job Started at')
+    print(datetime.now(), '\n\n\n')
     links = get_links()
-    for link in links:
-        res = get_product_page(link)
-        data = parse_product_page(res)
+
+    async with ClientSession() as session:
+        res = await asyncio.gather(*(get_product_page(link, session) for link in links))
+    for r in res:
+        data = await parse_product_page(*r)
         product_inserted = insert_product(data)
         history_inserted = insert_history(data)
+        print(history_inserted.acknowledged)
+        print(product_inserted, 'product inserted')
 
-        # print(history_inserted.acknowledged)
-        # print(product_inserted, 'product inserted')
-
-    print('Job was done at',)
-    print(time.localtime(), '\n\n\n\n\n\n')
+    print('Job was done at', )
+    print(datetime.now(), '\n\n\n')
 
 
 if __name__ == '__main__':
-    schedule.every(5).minutes.do(main())
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    m = lambda x = None: asyncio.run(main())
+    m()
+    schedule.every(3).minutes.do(m)
     while True:
         schedule.run_pending()
-        time.sleep(300)
